@@ -1,0 +1,101 @@
+@page "/profile/add"
+@inject MediaState MediaState
+@inject HttpClient HttpClient;
+@inject NavigationManager NavigationManager;
+@inject UserState UserState;
+
+
+
+<h1>Add New Media</h1>
+
+<div class="main">
+    <EditForm EditContext="@editContext" OnValidSubmit=AddItem>
+        <div class="add-cols">
+            <div class="add-media-details">
+                <h4>Information</h4>
+                @if (isError)
+                {
+                    <div class="alert alert-danger">Please enter valid information.</div>
+                }
+                <MediaItemForm Media="Media" />
+            </div>
+        </div>
+
+        <button class="add-button btn btn-warning" type="Submit" disabled=@isError>
+            Place order
+        </button>
+        <p>@success</p>
+
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+    </EditForm>
+</div>
+
+@code {
+
+    MediaItem Media => MediaState.MediaItem;
+
+    @* User User => UserState.user;  // Halted during testing, giving dummy user *@
+
+UserState userState = new UserState // Dummy User for Testing purspoese
+{
+    user = new User
+    {
+        Id = "MockUserId",
+        Name = "Mock User",
+        Email = "mockuser@example.com",
+        Phone = "123-456-7890",
+        MediaShelf = new List<MediaItem>()
+    }
+};
+    
+    bool isError = false;
+    string success = "";
+    EditContext? editContext;
+
+    protected override void OnInitialized() {
+       editContext = new(MediaState.MediaItem);
+       editContext.OnFieldChanged += HandleFieldChange;
+    }
+    void HandleFieldChange(object? sender, FieldChangedEventArgs e){
+        if (editContext != null){
+            bool isValid = editContext.Validate();
+            Console.WriteLine($"Field changed: {e.FieldIdentifier.FieldName}, Validation result: {isValid}");
+            isError = !isValid;
+            isError=!editContext.Validate();
+        }
+        else
+        {
+            Console.WriteLine("EditContext is null during field change.");
+            isError = true;
+        }
+    
+        StateHasChanged();
+    }
+    [HttpPost]
+    private async Task AddItem() {
+        try {
+            Media.SpecialId = UniqueId.CreateRandomId();
+            Media.UserId = userState.user.Id!; // Associating the UserId
+            var response = await HttpClient.PostAsJsonAsync(
+                $"{NavigationManager.BaseUri}media/add", Media);
+            if (response.IsSuccessStatusCode) {
+                MediaState.ResetMedia();
+                success = "Media has been added to the shelf!";
+            }
+            else {
+                success = "Something's gone wrong, please try again";
+                
+            }
+            
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Unable to Complete Request: {ex.Message}");
+        }
+    
+    }
+
+}
+
+    
+  
